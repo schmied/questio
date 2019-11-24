@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ui="http://java.sun.com/jsf/facelets" xmlns:f="http://java.sun.com/jsf/core"
+  xmlns:h="http://java.sun.com/jsf/html">
+<head>
+<link rel="stylesheet" type="text/css" href="/style.css" />
+<title>Administration</title>
+</head>
+<h:body>
+  <h:form>
+      Import Directory: <h:inputText style="width: 400px;" value="#{adminBean.importDirectory}" />
+    <h:commandButton value="Set" action="#{adminBean.actionSetImportDirectory}" />
+    <h:dataTable value="#{adminBean.dmFiles}" var="fileItem">
+      <h:column>#{fileItem}</h:column>
+      <h:column>
+        <h:commandButton value="Import" action="#{adminBean.actionImportFile}" />
+      </h:column>
+    </h:dataTable>
+  </h:form>
+</h:body>
+</html>
