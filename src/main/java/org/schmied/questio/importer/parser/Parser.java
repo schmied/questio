@@ -3,6 +3,7 @@ package org.schmied.questio.importer.parser;
 import java.io.BufferedReader;
 import java.util.Arrays;
 
+import org.schmied.questio.importer.Importer;
 import org.schmied.questio.importer.entity.ItemEntity;
 
 public abstract class Parser {
@@ -20,7 +21,7 @@ public abstract class Parser {
 			7187, // gene
 			8054, // protein
 			11053, // rna
-			21199, // natural number
+//			21199, // natural number
 			30612, // clinical trial
 			139677, // operon
 			201448, // transfer rna
@@ -35,13 +36,15 @@ public abstract class Parser {
 			5636047, // cell line
 			7644128, // supersecondary structure
 			11266439, // wikimedia template
-			13366104, // even number
-			13366129, // odd number
+//			13366104, // even number
+//			13366129, // odd number
+			13433827, // encyclopedic article
 			13406463, // wikimedia list article
 			13442814, // scholarly article
-			17633526, // wikinews article
+			13100073, // village-level division in China
 			14204246, // wikimedia project page
 			15184295, // wikimedia module
+			17633526, // wikinews article
 			19842659, // wikimedia user language template
 			20010800, // wikimedia user language category
 			20747295, // protein-coding gene
@@ -78,5 +81,22 @@ public abstract class Parser {
 	};
 	static {
 		Arrays.sort(TRANSITIVE_PROPERTY_IDS);
+	}
+
+	// ---
+
+	@SuppressWarnings("all")
+	public static final String validString(String s) {
+		if (s == null)
+			return null;
+		s = s.trim();
+		if (s.isEmpty())
+			return null;
+		if (s.length() > Importer.MAX_STRING_LENGTH) {
+			if (s.length() > 2 * Importer.MAX_STRING_LENGTH)
+				return null;
+			s = s.substring(0, Importer.MAX_STRING_LENGTH);
+		}
+		return s;
 	}
 }

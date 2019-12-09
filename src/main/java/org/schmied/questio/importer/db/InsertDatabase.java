@@ -6,7 +6,7 @@ import java.util.List;
 
 import org.schmied.questio.importer.entity.*;
 
-public class InsertDatabase extends ImporterDatabase {
+public class InsertDatabase extends ImportDatabase {
 
 	public static final int CAPACITY = 200;
 

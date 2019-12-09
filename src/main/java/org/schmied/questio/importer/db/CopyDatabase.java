@@ -9,8 +9,11 @@ import java.util.regex.Pattern;
 import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyManager;
 import org.schmied.questio.importer.entity.*;
+import org.slf4j.*;
 
-public class CopyDatabase extends ImporterDatabase {
+public class CopyDatabase extends ImportDatabase {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(CopyDatabase.class);
 
 	private static final int CAPACITY = 256 * 1024;
 
@@ -33,6 +36,7 @@ public class CopyDatabase extends ImporterDatabase {
 
 	@Override
 	protected void flushItems(final List<ItemEntity> entities) throws Exception {
+		final long ticks = System.currentTimeMillis();
 		final StringBuilder sb = new StringBuilder(4 * 16 * CAPACITY);
 		for (final ItemEntity e : entities) {
 			sb.append(e.itemId);
@@ -49,10 +53,12 @@ public class CopyDatabase extends ImporterDatabase {
 		} catch (final Exception e) {
 			throw e;
 		}
+		LOGGER.info("flush items [" + (System.currentTimeMillis() - ticks) + "ms]");
 	}
 
 	@Override
 	protected void flushClaimsGeo(final List<ClaimGeoEntity> entities) throws Exception {
+		final long ticks = System.currentTimeMillis();
 		final StringBuilder sb = new StringBuilder(4 * 16 * CAPACITY);
 		for (final ClaimGeoEntity e : entities) {
 			sb.append(e.itemId);
@@ -69,10 +75,12 @@ public class CopyDatabase extends ImporterDatabase {
 		} catch (final Exception e) {
 			throw e;
 		}
+		LOGGER.info("flush claims geo [" + (System.currentTimeMillis() - ticks) + "ms]");
 	}
 
 	@Override
 	protected void flushClaimsItem(final List<ClaimItemEntity> entities) throws Exception {
+		final long ticks = System.currentTimeMillis();
 		final StringBuilder sb = new StringBuilder(4 * 16 * CAPACITY);
 		for (final ClaimItemEntity e : entities) {
 			sb.append(e.itemId);
@@ -87,10 +95,12 @@ public class CopyDatabase extends ImporterDatabase {
 		} catch (final Exception e) {
 			throw e;
 		}
+		LOGGER.info("flush claims item [" + (System.currentTimeMillis() - ticks) + "ms]");
 	}
 
 	@Override
 	protected void flushClaimsQuantity(final List<ClaimQuantityEntity> entities) throws Exception {
+		final long ticks = System.currentTimeMillis();
 		final StringBuilder sb = new StringBuilder(4 * 16 * CAPACITY);
 		for (final ClaimQuantityEntity e : entities) {
 			sb.append(e.itemId);
@@ -107,10 +117,12 @@ public class CopyDatabase extends ImporterDatabase {
 		} catch (final Exception e) {
 			throw e;
 		}
+		LOGGER.info("flush claims quantity [" + (System.currentTimeMillis() - ticks) + "ms]");
 	}
 
 	@Override
 	protected void flushClaimsString(final List<ClaimStringEntity> entities) throws Exception {
+		final long ticks = System.currentTimeMillis();
 		final StringBuilder sb = new StringBuilder(4 * 16 * CAPACITY);
 		for (final ClaimStringEntity e : entities) {
 			sb.append(e.itemId);
@@ -129,10 +141,12 @@ public class CopyDatabase extends ImporterDatabase {
 		} catch (final Exception e) {
 			throw e;
 		}
+		LOGGER.info("flush claims string [" + (System.currentTimeMillis() - ticks) + "ms]");
 	}
 
 	@Override
 	protected void flushClaimsTime(final List<ClaimTimeEntity> entities) throws Exception {
+		final long ticks = System.currentTimeMillis();
 		final StringBuilder sb = new StringBuilder(4 * 16 * CAPACITY);
 		for (final ClaimTimeEntity e : entities) {
 
@@ -141,7 +155,7 @@ public class CopyDatabase extends ImporterDatabase {
 			if (isBc)
 				value = value.substring(1);
 			if (!PATTERN_DATE.matcher(value).matches()) {
-				System.out.println("value '" + value + "' is not a valid date.");
+				LOGGER.info("value '" + value + "' is not a valid date.");
 				continue;
 			}
 			if (isBc)
@@ -161,5 +175,6 @@ public class CopyDatabase extends ImporterDatabase {
 		} catch (final Exception e) {
 			throw e;
 		}
+		LOGGER.info("flush claims time [" + (System.currentTimeMillis() - ticks) + "ms]");
 	}
 }

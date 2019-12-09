@@ -1,10 +1,5 @@
 package org.schmied.questio.importer.entity;
 
-import java.sql.*;
-import java.util.*;
-
-import org.schmied.questio.importer.db.InsertDatabase;
-
 public class ClaimItemEntity extends ClaimEntity {
 
 	public final int value;
@@ -16,6 +11,7 @@ public class ClaimItemEntity extends ClaimEntity {
 
 	// ---------------------------------------------------------------------------------------------------------------- sql
 
+/*
 	public static void deleteInvalidReferences(final Connection cn) throws Exception {
 		final long ticks = System.currentTimeMillis();
 
@@ -29,7 +25,7 @@ public class ClaimItemEntity extends ClaimEntity {
 
 		final List<Integer[]> invalidClaims = new ArrayList<>();
 		try (final Statement st = cn.createStatement(); final ResultSet rs = st.executeQuery("SELECT item_id, value FROM claim_item")) {
-			final int[] itemIds = Questionator.intArray(itemIdList);
+			final int[] itemIds = Importer.intArray(itemIdList);
 			while (rs.next()) {
 				final int value = rs.getInt(2);
 				if (Arrays.binarySearch(itemIds, value) >= 0)
@@ -112,4 +108,5 @@ public class ClaimItemEntity extends ClaimEntity {
 		System.out.println("removed redunant claims: " + redundantClaims.size() + " [" + (System.currentTimeMillis() - ticks) + "ms]");
 		return true;
 	}
+*/
 }

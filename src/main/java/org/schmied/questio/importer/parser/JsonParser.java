@@ -6,16 +6,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import org.json.*;
-import org.schmied.questio.importer.Importer;
 import org.schmied.questio.importer.entity.*;
+import org.slf4j.*;
 
 public class JsonParser extends Parser {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(JsonParser.class);
 
 	private static final String label(final JSONObject labels, final String lang) {
 		final JSONObject o = labels.optJSONObject(lang);
 		if (o == null)
 			return null;
-		return Importer.validString(o.optString("value"));
+		return validString(o.optString("value"));
 	}
 
 	private static ClaimGeoEntity claimGeo(final int itemId, final int propertyId, final JSONObject json) {
@@ -64,7 +66,7 @@ public class JsonParser extends Parser {
 	private static ClaimStringEntity claimString(final int itemId, final int propertyId, final JSONObject json) {
 		if (!"string".equals(json.opt("type")))
 			return null;
-		final String value = Importer.validString(json.optString("value"));
+		final String value = validString(json.optString("value"));
 		if (value == null)
 			return null;
 		return new ClaimStringEntity(itemId, propertyId, value);
@@ -89,18 +91,17 @@ public class JsonParser extends Parser {
 				final int year = Integer.parseInt(time.split("-\\d\\d-")[0]);
 				value = LocalDateTime.of(year, 1, 1, 0, 0);
 			} catch (final Exception e2) {
-				System.out.println(
-						"Q" + itemId + " P" + propertyId + ": Cannot parse year from " + time + " (" + e2.getClass().getSimpleName() + ": " + e2.getMessage() + ")");
+				LOGGER.info("Q" + itemId + " P" + propertyId + ": Cannot parse year from " + time + " (" + e2.getClass().getSimpleName() + ": " + e2.getMessage() + ")");
 				return null;
 			}
 		}
 		final int year = value.getYear();
 		if (year < -4700 || year > 10000) {
-			System.out.println("Q" + itemId + " P" + propertyId + ": year " + year + " out of range for database");
+			LOGGER.info("Q" + itemId + " P" + propertyId + ": year " + year + " out of range for database");
 			return null;
 		}
 		if (year == 0) {
-			System.out.println("Q" + itemId + " P" + propertyId + ": year " + year + " does not exist, using year 1");
+			LOGGER.info("Q" + itemId + " P" + propertyId + ": year " + year + " does not exist, using year 1");
 			value = value.plusYears(1);
 		}
 		return new ClaimTimeEntity(itemId, propertyId, value.toLocalDate(), precision);
@@ -186,14 +187,14 @@ public class JsonParser extends Parser {
 		return claims;
 	}
 
-	private static ItemEntity item(final JSONObject json) {
+	private static ItemEntity item(final JSONObject json) throws Exception {
 		if (json == null)
-			return null;
+			throw new Exception("No JSON.");
 
 		// labels
 		final JSONObject jLabels = json.optJSONObject("labels");
 		if (jLabels == null)
-			return null;
+			throw new Exception("No labels for " + json.toString());
 		String labelEn = label(jLabels, "en");
 		String labelDe = label(jLabels, "de");
 		if (labelDe == null)
@@ -201,14 +202,14 @@ public class JsonParser extends Parser {
 		if (labelEn == null)
 			labelEn = labelDe;
 		if (labelEn == null || labelDe == null)
-			return null;
+			throw new Exception("No valid labels for " + json.toString());
 
 		// id
 		final String idString = json.optString("id");
 		if (idString == null)
-			return null;
+			throw new Exception("No id for " + json.toString());
 		if (idString.charAt(0) != 'Q')
-			return null;
+			throw new Exception("Id does not start with 'Q' for " + json.toString());
 		final int itemId = Integer.valueOf(idString.substring(1)).intValue();
 
 		// popularity
@@ -217,7 +218,7 @@ public class JsonParser extends Parser {
 
 		final List<ClaimEntity> claims = claims(json.optJSONObject("claims"), itemId, popularity);
 		if (claims == null)
-			return null;
+			throw new Exception("No claims for " + idString);
 
 		return new ItemEntity(itemId, claims, popularity, labelEn, labelDe);
 	}
@@ -235,13 +236,10 @@ public class JsonParser extends Parser {
 		if (line == null)
 			return null;
 		try {
-			//System.out.println(line);
 			final JSONObject json = new JSONObject(line);
 			return item(json);
-		} catch (final Exception e1) {
-			System.out.println(line);
-			e1.printStackTrace();
-			return null;
+		} catch (final Exception e) {
+			throw e;
 		}
 	}
 }

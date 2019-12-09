@@ -9,14 +9,17 @@
 </head>
 <h:body>
   <h:form>
-      Import Directory: <h:inputText style="width: 400px;" value="#{adminBean.importDirectory}" />
-    <h:commandButton value="Set" action="#{adminBean.actionSetImportDirectory}" />
+      Directory: <h:inputText style="width: 400px;" value="#{adminBean.directory}" />
+    <h:commandButton value="Set" action="#{adminBean.actionSetDirectory}" />
     <h:dataTable value="#{adminBean.dmFiles}" var="fileItem">
       <h:column>#{fileItem}</h:column>
       <h:column>
-        <h:commandButton value="Import" action="#{adminBean.actionImportFile}" />
+        <h:commandButton value="Select" action="#{adminBean.actionSelect}" />
       </h:column>
     </h:dataTable>
+    <h:inputText style="width: 400px;" value="#{adminBean.dbConnectionUrl}" />
+    <h:outputText value="#{adminBean.selection}" />
+    <h:commandButton value="Import" action="#{adminBean.actionImport}" />
   </h:form>
 </h:body>
 </html>

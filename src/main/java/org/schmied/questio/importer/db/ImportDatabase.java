@@ -2,10 +2,13 @@ package org.schmied.questio.importer.db;
 
 import java.sql.*;
 import java.util.*;
+import java.util.function.BiFunction;
 
+import org.schmied.questio.importer.Importer;
 import org.schmied.questio.importer.entity.*;
+import org.slf4j.*;
 
-public abstract class ImporterDatabase extends Database {
+public abstract class ImportDatabase extends Database {
 
 	protected abstract void flushItems(final List<ItemEntity> entities) throws Exception;
 
@@ -23,6 +26,8 @@ public abstract class ImporterDatabase extends Database {
 
 	// ---
 
+	private static final Logger LOGGER = LoggerFactory.getLogger(ImportDatabase.class);
+
 	private static final int CLAIM_CAPACITY_BUFFER = 10;
 
 	private final int capacity;
@@ -34,7 +39,7 @@ public abstract class ImporterDatabase extends Database {
 	private final ArrayList<ClaimStringEntity> claimsString;
 	private final ArrayList<ClaimTimeEntity> claimsTime;
 
-	public ImporterDatabase(final Connection connection, final int capacity) {
+	public ImportDatabase(final Connection connection, final int capacity) {
 		super(connection);
 		this.capacity = capacity;
 		items = new ArrayList<>(capacity);
@@ -92,7 +97,7 @@ public abstract class ImporterDatabase extends Database {
 		}
 		if (cntFlush > 0) {
 			final long elapsed = System.currentTimeMillis() - ticks;
-			System.out.println("flush " + cntFlush + " in " + elapsed + " ms (" + Math.round(1000.0 * cntFlush / elapsed) + " rows/s)");
+			LOGGER.info("flush " + cntFlush + " entries [" + elapsed + "ms " + Math.round(1000.0 * cntFlush / elapsed) + " rows/s]");
 		}
 	}
 
@@ -110,7 +115,7 @@ public abstract class ImporterDatabase extends Database {
 			else if (c instanceof ClaimTimeEntity)
 				claimsTime.add((ClaimTimeEntity) c);
 			else {
-				System.out.println("Unknows entity " + c.getClass().getName());
+				LOGGER.info("Unknows entity " + c.getClass().getName());
 				return false;
 			}
 		}
@@ -135,6 +140,7 @@ public abstract class ImporterDatabase extends Database {
 	// ---
 
 	public void recreateTables() throws Exception {
+		final long ticks = System.currentTimeMillis();
 		try (final Statement st = connection().createStatement()) {
 			// drop
 			st.execute("DROP TABLE IF EXISTS claim_geo");
@@ -145,22 +151,38 @@ public abstract class ImporterDatabase extends Database {
 			st.execute("DROP TABLE IF EXISTS item");
 			st.execute("DROP TABLE IF EXISTS property");
 			// create
-			st.execute("CREATE TABLE IF NOT EXISTS property       (property_id INT4 PRIMARY KEY, label_en character varying(" + MAX_STRING_LENGTH
-					+ ") NOT NULL, label_de character varying(" + MAX_STRING_LENGTH + ") NOT NULL)");
-			st.execute("CREATE TABLE IF NOT EXISTS item           (item_id INT4, popularity SMALLINT, label_en CHARACTER VARYING(" + MAX_STRING_LENGTH
-					+ "), label_de CHARACTER VARYING(" + MAX_STRING_LENGTH + "))");
+			st.execute("CREATE TABLE IF NOT EXISTS property       (property_id INT4 PRIMARY KEY, label_en character varying(" + Importer.MAX_STRING_LENGTH
+					+ ") NOT NULL, label_de character varying(" + Importer.MAX_STRING_LENGTH + ") NOT NULL)");
+			st.execute("CREATE TABLE IF NOT EXISTS item           (item_id INT4, popularity SMALLINT, label_en CHARACTER VARYING(" + Importer.MAX_STRING_LENGTH
+					+ "), label_de CHARACTER VARYING(" + Importer.MAX_STRING_LENGTH + "))");
 			st.execute("CREATE TABLE IF NOT EXISTS claim_geo      (item_id INT4, property_id INT4, lat REAL, lng REAL)");
 			st.execute("CREATE TABLE IF NOT EXISTS claim_item     (item_id INT4, property_id INT4, value INT4)");
 			st.execute("CREATE TABLE IF NOT EXISTS claim_quantity (item_id INT4, property_id INT4, value REAL, unit INT4)");
-			st.execute("CREATE TABLE IF NOT EXISTS claim_string   (item_id INT4, property_id INT4, value CHARACTER VARYING(" + MAX_STRING_LENGTH + "))");
+			st.execute("CREATE TABLE IF NOT EXISTS claim_string   (item_id INT4, property_id INT4, value CHARACTER VARYING(" + Importer.MAX_STRING_LENGTH + "))");
 			st.execute("CREATE TABLE IF NOT EXISTS claim_time     (item_id INT4, property_id INT4, value DATE, precision SMALLINT)");
 		} catch (final Exception e) {
 			throw e;
 		}
+		LOGGER.info("recreate tables [" + (System.currentTimeMillis() - ticks) + "ms]");
+	}
+
+	public void insertProperties() throws Exception {
+		final long ticks = System.currentTimeMillis();
+		for (final PropertyEntity property : PropertyEntity.VALID_PROPERTIES) {
+			try (final PreparedStatement ps = connection().prepareStatement("INSERT INTO property (property_id, label_en, label_de) VALUES (?, ?, ?)")) {
+				ps.setInt(1, property.propertyId);
+				ps.setString(2, property.labelEn);
+				ps.setString(3, property.labelDe);
+				ps.execute();
+			} catch (final SQLException e) {
+				throw e;
+			}
+		}
+		LOGGER.info("insert properties [" + (System.currentTimeMillis() - ticks) + "ms]");
 	}
 
 	public void createIndexes() throws Exception {
-		final long ticksIndex = System.currentTimeMillis();
+		final long ticks = System.currentTimeMillis();
 		try (final Statement st = connection().createStatement()) {
 			st.execute("ALTER TABLE item ADD CONSTRAINT pk_item_item_id PRIMARY KEY (item_id)");
 			st.execute("CREATE INDEX idx_item_label_en              ON item           USING btree (label_en)");
@@ -180,62 +202,101 @@ public abstract class ImporterDatabase extends Database {
 		} catch (final Exception e) {
 			throw e;
 		}
-		System.out.println("create indexes and analzye [" + (System.currentTimeMillis() - ticksIndex) + "ms]");
+		LOGGER.info("create indexes and analzye [" + (System.currentTimeMillis() - ticks) + "ms]");
 	}
 
 	public void addConstraints() throws Exception {
-		final long ticksIndex = System.currentTimeMillis();
+		final long ticks = System.currentTimeMillis();
 		try (final Statement st = connection().createStatement()) {
-			st.execute("ALTER TABLE claim_geo      ADD CONSTRAINT fk_claim_geo_item_id      FOREIGN KEY (item_id) REFERENCES item (item_id)");
-			st.execute("ALTER TABLE claim_item     ADD CONSTRAINT fk_claim_item_item_id     FOREIGN KEY (item_id) REFERENCES item (item_id)");
-			st.execute("ALTER TABLE claim_item     ADD CONSTRAINT fk_claim_item_value       FOREIGN KEY (value)   REFERENCES item (item_id)");
-			st.execute("ALTER TABLE claim_quantity ADD CONSTRAINT fk_claim_quantity_item_id FOREIGN KEY (item_id) REFERENCES item (item_id)");
-			st.execute("ALTER TABLE claim_string   ADD CONSTRAINT fk_claim_string_item_id   FOREIGN KEY (item_id) REFERENCES item (item_id)");
-			st.execute("ALTER TABLE claim_time     ADD CONSTRAINT fk_claim_time_item_id     FOREIGN KEY (item_id) REFERENCES item (item_id)");
+			st.execute("ALTER TABLE claim_geo      ADD CONSTRAINT fk_claim_geo_item_id           FOREIGN KEY (item_id)     REFERENCES item     (item_id)");
+			st.execute("ALTER TABLE claim_geo      ADD CONSTRAINT fk_claim_geo_property_id       FOREIGN KEY (property_id) REFERENCES property (property_id)");
+			st.execute("ALTER TABLE claim_item     ADD CONSTRAINT fk_claim_item_item_id          FOREIGN KEY (item_id)     REFERENCES item     (item_id)");
+			st.execute("ALTER TABLE claim_item     ADD CONSTRAINT fk_claim_item_value            FOREIGN KEY (value)       REFERENCES item     (item_id)");
+			st.execute("ALTER TABLE claim_item     ADD CONSTRAINT fk_claim_item_property_id      FOREIGN KEY (property_id) REFERENCES property (property_id)");
+			st.execute("ALTER TABLE claim_quantity ADD CONSTRAINT fk_claim_quantity_item_id      FOREIGN KEY (item_id)     REFERENCES item     (item_id)");
+			st.execute("ALTER TABLE claim_quantity ADD CONSTRAINT fk_claim_quantity_property_id  FOREIGN KEY (property_id) REFERENCES property (property_id)");
+			st.execute("ALTER TABLE claim_string   ADD CONSTRAINT fk_claim_string_item_id        FOREIGN KEY (item_id)     REFERENCES item     (item_id)");
+			st.execute("ALTER TABLE claim_string   ADD CONSTRAINT fk_claim_string_property_id    FOREIGN KEY (property_id) REFERENCES property (property_id)");
+			st.execute("ALTER TABLE claim_time     ADD CONSTRAINT fk_claim_time_item_id          FOREIGN KEY (item_id)     REFERENCES item     (item_id)");
+			st.execute("ALTER TABLE claim_time     ADD CONSTRAINT fk_claim_geo_property_id       FOREIGN KEY (property_id) REFERENCES property (property_id)");
 		} catch (final Exception e) {
 			throw e;
 		}
-		System.out.println("add constraints [" + (System.currentTimeMillis() - ticksIndex) + "ms]");
+		LOGGER.info("add constraints [" + (System.currentTimeMillis() - ticks) + "ms]");
 	}
 
-	public void insertProperties() throws Exception {
-		for (final PropertyEntity property : PropertyEntity.VALID_PROPERTIES) {
-			try (final PreparedStatement ps = connection().prepareStatement("INSERT INTO property (property_id, label_en, label_de) VALUES (?, ?, ?)")) {
-				ps.setInt(1, property.propertyId);
-				ps.setString(2, property.labelEn);
-				ps.setString(3, property.labelDe);
-				ps.execute();
-			} catch (final SQLException e) {
-				throw e;
-			}
+	// ---
+
+	private static final int IN_CLAUSE_MAX_COUNT = 400;
+
+	private static String inClauseCommaSeparate(final int ids[]) {
+		final StringBuilder sb = new StringBuilder();
+		sb.append(ids[0]);
+		for (int i = 1; i < ids.length; i++)
+			sb.append(", " + ids[i]);
+		return sb.toString();
+	}
+
+	private int delete(final String table, final String column, final int ids[]) throws Exception {
+		final String sql = "DELETE FROM " + table + " WHERE " + column + " IN (" + inClauseCommaSeparate(ids) + ")";
+		try (final PreparedStatement ps = connection().prepareStatement(sql)) {
+			return ps.executeUpdate();
+		} catch (final Exception e) {
+			throw e;
 		}
 	}
 
-	private static int deleteItems(final Database db, final int[] itemIds) throws Exception {
+	public static Boolean deleteItems(final ImportDatabase db, final int[] itemIds) {
+		try {
+			final long ticks = System.currentTimeMillis();
+			final int cntClaimGeo = db.delete("claim_geo", "item_id", itemIds);
+			final int cntClaimItem = db.delete("claim_item", "item_id", itemIds);
+			//final int cntClaimItemValue = db.delete("claim_item", "value", itemIds);
+			final int cntClaimQuantity = db.delete("claim_quantity", "item_id", itemIds);
+			final int cntClaimString = db.delete("claim_string", "item_id", itemIds);
+			final int cntClaimTime = db.delete("claim_time", "item_id", itemIds);
+			final int cntItem = db.delete("item", "item_id", itemIds);
+			LOGGER.info("delete items: " + cntClaimGeo + " claim_geo, " + cntClaimItem + " claim_item (id), " + cntClaimQuantity + " claim_quantity, " + cntClaimString
+					+ " claim_string, " + cntClaimTime + " claim_time, " + cntItem + " item / " + itemIds.length + " [" + (System.currentTimeMillis() - ticks) + "ms]");
+		} catch (final Exception e) {
+			LOGGER.warn(e.getMessage());
+		}
+		return Boolean.TRUE;
+	}
 
-		final int[] referenced = db.referenced(itemIds, null);
-		if (referenced.length > 0)
-			throw new Exception("referenced by " + Arrays.toString(referenced));
+	public static Boolean deleteClaimItems(final ImportDatabase db, final int[] claimItemIds) {
+		try {
+			final long ticks = System.currentTimeMillis();
+			final int cntClaimItem = db.delete("claim_item", "item_id", claimItemIds);
+			LOGGER.info("delete claim items: " + cntClaimItem + " [" + (System.currentTimeMillis() - ticks) + "ms]");
+		} catch (final Exception e) {
+			LOGGER.warn(e.getMessage());
+		}
+		return Boolean.TRUE;
+	}
 
-		final long ticks = System.currentTimeMillis();
-		//final Database db = new Database(cn);
-
-		final int cntClaimGeo = db.delete("claim_geo", "item_id", itemIds);
-		final int cntClaimItem = db.delete("claim_item", "item_id", itemIds);
-		//final int cntClaimItemValue = db.delete("claim_item", "value", itemIds);
-		final int cntClaimQuantity = db.delete("claim_quantity", "item_id", itemIds);
-		final int cntClaimString = db.delete("claim_string", "item_id", itemIds);
-		final int cntClaimTime = db.delete("claim_time", "item_id", itemIds);
-		final int cntItem = db.delete("item", "item_id", itemIds);
-
-//		System.out.println("delete items: " + cntClaimGeo + " claim_geo, " + cntClaimItem + " claim_item (id), " + cntClaimItemValue + " claim_item (value), "
-//				+ cntClaimQuantity + " claim_quantity, " + cntClaimString + " claim_string, " + cntClaimTime + " claim_time, " + cntItem + " item / " + itemIds.length
-//				+ " [" + (System.currentTimeMillis() - ticks) + "ms]");
-		System.out.println("delete items: " + cntClaimGeo + " claim_geo, " + cntClaimItem + " claim_item (id), " + cntClaimQuantity + " claim_quantity, " + cntClaimString
-				+ " claim_string, " + cntClaimTime + " claim_time, " + cntItem + " item / " + itemIds.length + " [" + (System.currentTimeMillis() - ticks) + "ms]");
-
-//		return cntClaimGeo + cntClaimItem + cntClaimItemValue + cntClaimQuantity + cntClaimString + cntClaimTime + cntItem;
-//		return cntClaimGeo + cntClaimItem + cntClaimQuantity + cntClaimString + cntClaimTime + cntItem;
-		return cntItem;
+	public void blaaa(final String sql, final int maxSize, final BiFunction<ImportDatabase, int[], Boolean> callback) throws Exception {
+		boolean reset = false;
+		try (final PreparedStatement pst = connection().prepareStatement(sql); final ResultSet rs = pst.executeQuery()) {
+			final int[] arr = new int[maxSize];
+			int cnt = 0;
+			while (!reset && rs.next()) {
+				arr[cnt] = rs.getInt(1);
+				cnt++;
+				if (cnt >= maxSize) {
+					final Boolean b = callback.apply(this, Arrays.copyOf(arr, cnt));
+					reset = b != null && b.booleanValue();
+					cnt = 0;
+				}
+			}
+			if (!reset && cnt > 0) {
+				callback.apply(this, Arrays.copyOf(arr, cnt));
+			}
+		} catch (final Exception e) {
+			throw e;
+		} finally {
+		}
+		if (reset)
+			blaaa(sql, maxSize, callback);
 	}
 }

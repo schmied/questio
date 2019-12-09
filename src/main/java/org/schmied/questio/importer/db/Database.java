@@ -1,13 +1,10 @@
 package org.schmied.questio.importer.db;
 
-import java.sql.*;
-import java.util.*;
+import java.sql.Connection;
 
 public class Database {
 
-	private static final int IN_CLAUSE_MAX_COUNT = 400;
-
-	protected static final int MAX_STRING_LENGTH = 100;
+//	private static final int IN_CLAUSE_MAX_COUNT = 400;
 
 	private final Connection connection;
 
@@ -19,6 +16,7 @@ public class Database {
 		return connection;
 	}
 
+/*
 	private static final int[] intArray(final Collection<? extends Number> c) {
 		if (c == null)
 			return null;
@@ -104,4 +102,5 @@ public class Database {
 		}
 		return deleteCount;
 	}
+*/
 }
